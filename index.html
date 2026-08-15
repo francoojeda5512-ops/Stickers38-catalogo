@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Sticker Shop — Frutiger Aero</title>
+<title>Sticker Shop V4 — Metro Aero</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#17324d;background:linear-gradient(160deg,#dffcff,#8edfff 45%,#c7f7df);min-height:100vh}
 header{padding:20px 18px 12px;position:sticky;top:0;z-index:5;background:rgba(225,250,255,.88);backdrop-filter:blur(12px);border-bottom:1px solid #fff}
@@ -22,9 +22,30 @@ button,input,select{font:inherit}button{cursor:pointer}input,select{width:100%;p
 .modal{position:fixed;inset:0;background:rgba(15,55,75,.35);display:none;align-items:flex-end;justify-content:center;z-index:20}.modal.show{display:flex}.sheet{width:min(900px,100%);max-height:92vh;overflow:auto;background:#effcff;border-radius:25px 25px 0 0;padding:18px;box-shadow:0 -10px 35px rgba(0,0,0,.2)}
 @media(min-width:650px){.modal{align-items:center}.sheet{border-radius:25px;max-width:600px}.stats{grid-template-columns:repeat(4,1fr)}}
 </style>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#40aee8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon.svg">
+
+<style>
+body{
+  background:#bcefff;
+  background-image:
+    radial-gradient(circle at 12% 14%,rgba(255,255,255,.85) 0 22px,transparent 23px),
+    radial-gradient(circle at 82% 9%,rgba(255,255,255,.7) 0 30px,transparent 31px),
+    radial-gradient(circle at 70% 72%,rgba(255,255,255,.45) 0 18px,transparent 19px),
+    linear-gradient(175deg,rgba(255,255,255,.55),transparent 32%),
+    repeating-linear-gradient(8deg,transparent 0 92px,rgba(31,139,188,.18) 93px 98px,transparent 99px 168px),
+    linear-gradient(155deg,#e2fcff 0%,#86dcff 50%,#b9f1d2 100%);
+  background-attachment:fixed;
+}
+</style>
 </head>
 <body>
-<header><h1>🌊 Sticker Shop</h1><div class="sub">Frutiger Aero · catálogo y ventas</div></header>
+<header><h1>🚇 Sticker Shop V4</h1><div class="sub">Frutiger Aero · catálogo, ventas y stock</div>
+<button id="installBtn" class="ghost" style="margin-top:8px;display:none" onclick="installApp()">＋ Instalar app</button></header>
 <main>
 <section id="home" class="view active">
 <div class="card"><div class="stats">
@@ -38,7 +59,7 @@ button,input,select{font:inherit}button{cursor:pointer}input,select{width:100%;p
 </section>
 
 <section id="catalog" class="view">
-<div class="card"><div class="row"><input id="search" placeholder="Buscar producto..." oninput="renderCatalog()"><select id="catFilter" onchange="renderCatalog()"></select></div></div>
+<div class="card"><div class="notice">Stickers normales: $1.500 · Planchas: $8.000 · Encendedores: $1.500 · Llaveros: $5.000. Todo se puede editar.</div><div class="row"><input id="search" placeholder="Buscar producto..." oninput="renderCatalog()"><select id="catFilter" onchange="renderCatalog()"></select></div></div>
 <div id="catGrid" class="grid"></div>
 </section>
 
@@ -66,11 +87,12 @@ button,input,select{font:inherit}button{cursor:pointer}input,select{width:100%;p
 </nav>
 
 <div id="modal" class="modal"><div class="sheet">
-<h2 id="modalTitle">Nuevo producto</h2>
+<h2 id="modalTitle">Nuevo producto</h2><div class="notice">Precio, foto y stock son editables. Los precios de catálogo arrancan con los valores establecidos.</div>
 <input type="hidden" id="editId">
 <label>Nombre</label><input id="pName" placeholder="Ej: Marcas 1">
 <label>Categoría</label><select id="pCat"></select>
 <label>Precio ($)</label><input id="pPrice" type="number" min="0" step="1" placeholder="3000">
+<label>Stock</label><input id="pStock" type="number" min="0" step="1" placeholder="0">
 <label>Foto</label><input id="pPhoto" type="file" accept="image/*">
 <div id="photoPreview" class="pic" style="margin-top:8px;height:160px">📷</div>
 <div class="row" style="margin-top:14px"><button class="ghost" onclick="closeModal()">Cancelar</button><button class="primary" onclick="saveProduct()">Guardar</button></div>
@@ -78,7 +100,9 @@ button,input,select{font:inherit}button{cursor:pointer}input,select{width:100%;p
 
 <script>
 const categories={
-"Marcas":106,"Memes":21,"Motos":44,"Music arg":60,"Music ing":52,"Netflix":20,"Fútbol":56,"Games":20,"Tatto":40,"Weed":77,"Niños":70,"otaku":73,"Astros":30
+"Marcas":106,"Memes":21,"Motos":44,"Music arg":60,"Music ing":52,"Netflix":20,"Fútbol":56,"Games":20,"Tatto":40,"Weed":77,"Niños":70,"otaku":73,"Astros":30,
+"Planchas Marcas":3,"Planchas Memes":3,"Planchas Motos":3,"Planchas Music arg":3,"Planchas Music ing":3,"Planchas Netflix":3,"Planchas Fútbol":3,"Planchas Games":3,"Planchas Tatto":3,"Planchas Weed":3,"Planchas Niños":3,"Planchas otaku":3,"Planchas Astros":3,
+"Encendedores":0,"Llaveros":0
 };
 const dbName='sticker_shop_v2';
 let db, products=[], sales=[], selectedPhoto=null;
@@ -89,14 +113,32 @@ function all(store){return new Promise((res,rej)=>{let r=tx(store).getAll();r.on
 function put(store,obj){return new Promise((res,rej)=>{let r=tx(store,'readwrite').put(obj);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
 function del(store,id){return new Promise((res,rej)=>{let r=tx(store,'readwrite').delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
 
-function money(n){return '$'+Math.round(Number(n)||0).toLocaleString('es-AR')}
+function money(n){return '$'+Math.round(Number(n)||0).toLocaleString('es-AR')}function defaultPrice(cat){
+ if(cat.startsWith("Planchas ")) return 8000;
+ if(cat==="Encendedores") return 1500;
+ if(cat==="Llaveros") return 5000;
+ return 1500;
+}
+
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function seedProducts(){
-  return Promise.all(Object.entries(categories).flatMap(([cat,n])=>Array.from({length:n},(_,i)=>put('products',{id:crypto.randomUUID(),name:`${cat} ${i+1}`,category:cat,price:0,photo:null,createdAt:Date.now()}))))
+  return Promise.all(Object.entries(categories).flatMap(([cat,n])=>Array.from({length:n},(_,i)=>put('products',{id:crypto.randomUUID(),name:`${cat} ${i+1}`,category:cat,price:defaultPrice(cat),photo:null,stock:0,createdAt:Date.now()}))))
 }
+
+async function migratePrices(){
+ let changed=false;
+ for(const p of products){
+   if((Number(p.price)||0)===0){
+     p.price=defaultPrice(p.category); await put('products',p); changed=true;
+   }
+ }
+ if(changed) products=await all('products');
+}
+
 async function init(){
  await openDB(); products=await all('products'); sales=await all('sales');
  if(!products.length){await seedProducts();products=await all('products')}
+ await migratePrices();
  fillCategories(); renderAll();
 }
 function fillCategories(){
@@ -110,7 +152,9 @@ function go(id){
  renderAll();
 }
 function productCard(p,sell=false){
- return `<div class="product"><div class="pic">${p.photo?`<img src="${p.photo}">`:'🏷️'}</div><div class="pbody"><div class="pname">${esc(p.name)}</div><div class="muted">${esc(p.category)}</div><div class="price">${p.price?money(p.price):'Precio sin cargar'}</div>${sell?`<button class="primary" onclick="sellProduct('${p.id}')">Vender</button>`:`<div class="row"><button class="ghost" onclick="openProduct('${p.id}')">Editar</button><button class="ghost danger" onclick="removeProduct('${p.id}')">Borrar</button></div>`}</div></div>`
+ return `<div class="product"><div class="pic">${p.photo?`<img src="${p.photo}">`:'🏷️'}</div><div class="pbody"><div class="pname">${esc(p.name)}</div><div class="muted">${esc(p.category)}</div><div class="price">${p.price?money(p.price):'Precio sin cargar'}</div>
+<div class="muted">Stock: <b>${Number(p.stock)||0}</b></div>${sell?(Number(p.stock)>0?`<button class="primary" onclick="sellProduct('${p.id}')">Vender</button>`:`<button class="ghost" disabled>SIN STOCK</button>`):`<div class="row"><button class="ghost" onclick="openProduct('${p.id}')">Editar</button><button class="ghost" onclick="adjustStock('${p.id}',1)">+ Stock</button></div>
+<div class="row" style="margin-top:7px"><button class="ghost" onclick="adjustStock('${p.id}',-1)">− Stock</button><button class="ghost danger" onclick="removeProduct('${p.id}')">Borrar</button></div>`}</div></div>`
 }
 function renderCatalog(){
  let q=document.getElementById('search').value.toLowerCase(),c=document.getElementById('catFilter').value;
@@ -146,14 +190,19 @@ function renderStats(){
 function renderAll(){renderHome();renderCatalog();renderSaleProducts();renderHistory();renderStats()}
 function openProduct(id){
  selectedPhoto=null;document.getElementById('modal').classList.add('show');document.getElementById('editId').value=id||'';
- if(id){let p=products.find(x=>x.id===id);document.getElementById('modalTitle').textContent='Editar producto';document.getElementById('pName').value=p.name;document.getElementById('pCat').value=p.category;document.getElementById('pPrice').value=p.price||'';selectedPhoto=p.photo||null;document.getElementById('photoPreview').innerHTML=p.photo?`<img src="${p.photo}">`:'📷'}
- else{document.getElementById('modalTitle').textContent='Nuevo producto';document.getElementById('pName').value='';document.getElementById('pPrice').value='';document.getElementById('pCat').selectedIndex=0;document.getElementById('photoPreview').textContent='📷'}
+ if(id){let p=products.find(x=>x.id===id);document.getElementById('modalTitle').textContent='Editar producto';document.getElementById('pName').value=p.name;document.getElementById('pCat').value=p.category;document.getElementById('pPrice').value=p.price||'';document.getElementById('pStock').value=p.stock??0;selectedPhoto=p.photo||null;document.getElementById('photoPreview').innerHTML=p.photo?`<img src="${p.photo}">`:'📷'}
+ else{document.getElementById('modalTitle').textContent='Nuevo producto';document.getElementById('pName').value='';document.getElementById('pPrice').value=defaultPrice(document.getElementById('pCat').value);document.getElementById('pStock').value='0';document.getElementById('pCat').selectedIndex=0;document.getElementById('pPrice').value=defaultPrice(document.getElementById('pCat').value);document.getElementById('photoPreview').textContent='📷'}
 }
 function closeModal(){document.getElementById('modal').classList.remove('show')}
+document.getElementById('pCat').addEventListener('change',()=>{
+ if(!document.getElementById('editId').value){
+   document.getElementById('pPrice').value=defaultPrice(document.getElementById('pCat').value);
+ }
+});
 document.getElementById('pPhoto').addEventListener('change',e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{selectedPhoto=r.result;document.getElementById('photoPreview').innerHTML=`<img src="${selectedPhoto}">`};r.readAsDataURL(f)})
 async function saveProduct(){
  let id=document.getElementById('editId').value,p= id?products.find(x=>x.id===id):null;
- let obj={id:id||crypto.randomUUID(),name:document.getElementById('pName').value.trim(),category:document.getElementById('pCat').value,price:Number(document.getElementById('pPrice').value)||0,photo:selectedPhoto,createdAt:p?.createdAt||Date.now()};
+ let obj={id:id||crypto.randomUUID(),name:document.getElementById('pName').value.trim(),category:document.getElementById('pCat').value,price:Number(document.getElementById('pPrice').value)||0,stock:Math.max(0,Math.floor(Number(document.getElementById('pStock').value)||0)),photo:selectedPhoto,createdAt:p?.createdAt||Date.now()};
  if(!obj.name){alert('Falta el nombre.');return} await put('products',obj);products=await all('products');closeModal();renderAll();
 }
 async function removeProduct(id){if(!confirm('¿Borrar este producto? Las ventas anteriores se mantienen.'))return;await del('products',id);products=await all('products');renderAll()}
@@ -161,9 +210,31 @@ async function sellProduct(id){
  let p=products.find(x=>x.id===id);if(!p)return;
  if(p.price<=0){openProduct(id);alert('Primero cargá el precio de este producto.');return}
  let q=prompt(`¿Cuántas unidades vendiste de "${p.name}"?`,'1');if(q===null)return;q=Math.floor(Number(q));if(!q||q<1){alert('Cantidad inválida.');return}
+ if(q>Number(p.stock||0)){alert(`No hay suficiente stock. Tenés ${Number(p.stock)||0}.`);return}
  await put('sales',{id:crypto.randomUUID(),productId:p.id,productName:p.name,category:p.category,qty:q,unitPrice:p.price,total:q*p.price,date:Date.now()});
- sales=await all('sales');renderAll();alert(`Venta registrada: ${q} × ${p.name} = ${money(q*p.price)}`);
+ p.stock=Number(p.stock||0)-q; await put('products',p); products=await all('products'); sales=await all('sales'); renderAll(); alert(`Venta registrada: ${q} × ${p.name} = ${money(q*p.price)}`);
 }
+
+async function adjustStock(id,delta){
+ let p=products.find(x=>x.id===id); if(!p)return;
+ let a=prompt(delta>0?'¿Cuántas unidades entraron?':'¿Cuántas unidades querés quitar?','1');
+ if(a===null)return; a=Math.floor(Number(a)); if(!a||a<1)return;
+ if(delta<0 && a>Number(p.stock||0)){alert('No podés bajar el stock por debajo de 0.');return}
+ p.stock=Math.max(0,(Number(p.stock)||0)+delta*a);
+ await put('products',p); products=await all('products'); renderAll();
+}
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+ e.preventDefault(); deferredPrompt=e;
+ const b=document.getElementById('installBtn'); if(b)b.style.display='inline-block';
+});
+async function installApp(){
+ if(!deferredPrompt){alert('Abrí la app desde Chrome y usá ⋮ → Instalar aplicación / Añadir a pantalla de inicio.');return}
+ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null;
+ document.getElementById('installBtn').style.display='none';
+}
+if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+
 init();
 </script>
 </body>
